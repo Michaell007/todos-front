@@ -1,21 +1,27 @@
-FROM node:18-alpine AS builder
+# Étape 1 : Build du projet
+FROM node:18-alpine AS build
 WORKDIR /app
+
+# Copier les dépendances
 COPY package*.json ./
-RUN npm ci
+RUN npm install
+
+# Copier tout le code
 COPY . .
 
-# Stage de production
-FROM node:18-alpine
-WORKDIR /app
-ENV NODE_ENV=production
+# Build de l'app
+RUN npm run build
 
-# Copier les fichiers construits / sources depuis le builder
-COPY --from=builder /app ./
 
-# Installer uniquement les dépendances de production
-RUN npm ci --omit=dev
+# Étape 2 : Image légère avec NGINX
+FROM nginx:stable-alpine
 
-EXPOSE 5173
+# Copier le build dans nginx
+COPY --from=build /app/dist /usr/share/nginx/html
 
-# Commande de démarrage : utilise "npm start" (assurez-vous que package.json contient un script "start")
-CMD ["npm", "start"]
+# Copier une configuration nginx personnalisée (optionnel)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
